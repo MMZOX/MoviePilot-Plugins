@@ -1,4 +1,3 @@
-import os
 import datetime
 import re
 import shutil
@@ -41,7 +40,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "0.4"
+    plugin_version = "0.2"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -987,11 +986,11 @@ class DirWalker(_PluginBase):
         if not min_filesize:
             min_filesize = 0
 
-        pattern = re.compile(r".*(" + "|".join(extensions) + r")$", re.IGNORECASE)
-        min_filesize_bytes = min_filesize * 1024 * 1024
+        pattern = r".*(" + "|".join(extensions) + ")$"
 
-        for root, _, files in os.walk(directory):
-            for file_name in files:
-                file_path = Path(root) / file_name
-                if pattern.match(file_name) and file_path.stat().st_size >= min_filesize_bytes:
-                    yield file_path
+        # 遍历目录及子目录
+        for path in directory.rglob('**/*'):
+            if path.is_file() \
+                    and re.match(pattern, path.name, re.IGNORECASE) \
+                    and path.stat().st_size >= min_filesize * 1024 * 1024:
+                yield path
