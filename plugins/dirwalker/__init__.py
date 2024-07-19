@@ -48,7 +48,22 @@ def my_scandir(path=None):
                  pass
          return wrapped_result()
 
-pathlib._NormalAccessor.scandir = staticmethod(my_scandir)
+def select_from(self, parent_path):
+    """Iterate over all child paths of `parent_path` matched by this
+    selector.  This can contain parent_path itself."""
+    path_cls = type(parent_path)
+    is_dir = path_cls.is_dir
+    exists = path_cls.exists
+    scandir = staticmethod(my_scandir)
+    if not is_dir(parent_path):
+        return iter([])
+    return self._select_from(parent_path, is_dir, exists, scandir)
+
+pathlib._Selector.select_from = select_from
+
+
+
+#.scandir = staticmethod(my_scandir)
 
 lock = threading.Lock()
 
