@@ -58,7 +58,7 @@ class DirWalker(_PluginBase):
     # 插件描述
     plugin_desc = "定时整理目录文件到媒体库。"
     # 插件图标
-    plugin_icon = "directory.png"
+    plugin_icon = "dir_walker.png"
     # 插件版本
     plugin_version = "0.1"
     # 插件作者
