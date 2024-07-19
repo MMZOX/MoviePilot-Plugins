@@ -8,6 +8,7 @@
         "author": "MMZOX",
         "level": 1,
         "history": {
+            "v1.3": "fix",
             "v1.2": "fix file not found error",
             "v1.1": "remove unused options",
             "v1.0": "first working version"
