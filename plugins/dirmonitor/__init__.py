@@ -52,7 +52,7 @@ class FileMonitorHandler(FileSystemEventHandler):
                                 mon_path=self._watch_path, event_path=event.dest_path)
 
 
-class DirMonitor(_PluginBase):
+class DirWalker(_PluginBase):
     # 插件名称
     plugin_name = "定时目录同步"
     # 插件描述
@@ -60,7 +60,7 @@ class DirMonitor(_PluginBase):
     # 插件图标
     plugin_icon = "directory.png"
     # 插件版本
-    plugin_version = "2.4"
+    plugin_version = "0.1"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
