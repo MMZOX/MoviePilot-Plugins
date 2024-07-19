@@ -40,7 +40,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "0.6"
+    plugin_version = "0.7"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -433,27 +433,27 @@ class DirWalker(_PluginBase):
                     transferinfo=transferinfo
                 )
 
-                # 刮削单个文件
-                if self._scrape:
-                    self.chain.scrape_metadata(path=transferinfo.target_path,
-                                               mediainfo=mediainfo,
-                                               transfer_type=transfer_type)
+                # # 刮削单个文件
+                # if self._scrape:
+                #     self.chain.scrape_metadata(path=transferinfo.target_path,
+                #                                mediainfo=mediainfo,
+                #                                transfer_type=transfer_type)
 
-                """
-                {
-                    "title_year season": {
-                        "files": [
-                            {
-                                "path":,
-                                "mediainfo":,
-                                "file_meta":,
-                                "transferinfo":
-                            }
-                        ],
-                        "time": "2023-08-24 23:23:23.332"
-                    }
-                }
-                """
+                # """
+                # {
+                #     "title_year season": {
+                #         "files": [
+                #             {
+                #                 "path":,
+                #                 "mediainfo":,
+                #                 "file_meta":,
+                #                 "transferinfo":
+                #             }
+                #         ],
+                #         "time": "2023-08-24 23:23:23.332"
+                #     }
+                # }
+                # """
                 # 发送消息汇总
                 # media_list = self._medias.get(mediainfo.title_year + " " + file_meta.season) or {}
                 # if media_list:
@@ -506,16 +506,24 @@ class DirWalker(_PluginBase):
                 # })
 
                 # 移动模式删除空目录
+                # if transfer_type == "move":
+                #     logger.info(f"移动模式, decide空目录：{file_path}")
+                #     for file_dir in file_path.parents:
+                #         if len(str(file_dir)) <= len(str(Path(mon_path))):
+                #             # 重要，删除到监控目录为止
+                #             break
+                #         files = SystemUtils.list_files(file_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT)
+                #         if not files:
+                #             logger.warn(f"移动模式，删除空目录：{file_dir}")
+                #             shutil.rmtree(file_dir, ignore_errors=True)
                 if transfer_type == "move":
-                    logger.debug(f"移动模式, decide空目录：{file_path}")
-                    for file_dir in file_path.parents:
-                        if len(str(file_dir)) <= len(str(Path(mon_path))):
-                            # 重要，删除到监控目录为止
-                            break
-                        files = SystemUtils.list_files(file_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT)
-                        if not files:
-                            logger.warn(f"移动模式，删除空目录：{file_dir}")
-                            shutil.rmtree(file_dir, ignore_errors=True)
+                    logger.info(f"移动模式, decide空目录：{file_path}")
+                    parent_dir = file_path.parent
+                    for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
+                        break
+                    else:
+                        logger.info(f"移动模式，删除空目录：{parent_dir}")
+                        shutil.rmtree(parent_dir, ignore_errors=True)
 
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
