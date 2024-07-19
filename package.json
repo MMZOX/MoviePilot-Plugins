@@ -8,7 +8,7 @@
         "author": "MMZOX",
         "level": 1,
         "history": {
-            "v0.5": "verbose logging",
+            "v0.5": "error handling",
             "v0.4": "verbose logging",
             "v0.3": "skip msg",
             "v0.2": "improve fuse fs performance",
