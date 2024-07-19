@@ -33,34 +33,6 @@ from app.schemas.types import EventType, MediaType, SystemConfigKey
 from app.utils.string import StringUtils
 from app.utils.system import SystemUtils
 
-# dirty hack
-# def my_scandir(path=None):
-#      while True:
-#          try:
-#              result = list(os.scandir(path))
-#          except FileNotFoundError:
-#              continue
-#          @contextlib.contextmanager
-#          def wrapped_result():
-#              try:
-#                  yield result
-#              finally:
-#                  pass
-#          return wrapped_result()
-# 
-# def select_from(self, parent_path):
-#     """Iterate over all child paths of `parent_path` matched by this
-#     selector.  This can contain parent_path itself."""
-#     path_cls = type(parent_path)
-#     is_dir = path_cls.is_dir
-#     exists = path_cls.exists
-#     scandir = my_scandir
-#     if not is_dir(parent_path):
-#         return iter([])
-#     return self._select_from(parent_path, is_dir, exists, scandir)
-# 
-# pathlib._Selector.select_from = select_from
-
 lock = threading.Lock()
 
 class DirWalker(_PluginBase):
@@ -71,7 +43,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "1.5"
+    plugin_version = "1.6"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -104,7 +76,6 @@ class DirWalker(_PluginBase):
     _interval: int = 10
     # 存储源目录与目的目录关系
     _dirconf: Dict[str, Optional[Path]] = {}
-    _dir_to_del: List[str] = []
     # 存储源目录转移方式
     _transferconf: Dict[str, Optional[str]] = {}
     _medias = {}
@@ -119,7 +90,6 @@ class DirWalker(_PluginBase):
         self.tmdbchain = TmdbChain()
         # 清空配置
         self._dirconf = {}
-        self._dir_to_del = []
         self._transferconf = {}
 
         # 读取配置
@@ -253,12 +223,12 @@ class DirWalker(_PluginBase):
         # 遍历所有监控目录
         for mon_path in self._dirconf.keys():
             # 遍历目录下所有文件
-            for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
-                logger.info(f"处理文件：{file_path}")
-                try:
+            try: 
+                for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
+                    logger.info(f"处理文件：{file_path}")
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)
-                except Exception as e:
-                    logger.error(f"处理文件 {file_path} 时发生错误：{e}")
+            except Exception as e:
+                logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
         logger.info("全量同步监控目录完成！")
 
     def event_handler(self, event, mon_path: str, text: str, event_path: str):
@@ -544,14 +514,8 @@ class DirWalker(_PluginBase):
                     for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
                         break
                     else:
-                        if not parent_dir in self._dir_to_del:
-                            for dir in self._dir_to_del:
-                                if len(list(self.list_files(dir))) == 0:
-                                    logger.info(f"移动模式，删除空目录：{dir}")
-                                    shutil.rmtree(dir, ignore_errors=True)
-                            logger.info(f"移动模式，计入删除缓存：{parent_dir}")
-                            self._dir_to_del.append(parent_dir)
-                        # shutil.rmtree(parent_dir, ignore_errors=True)
+                        logger.info(f"移动模式，删除空目录：{parent_dir}")
+                        shutil.rmtree(parent_dir, ignore_errors=True)
 
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
@@ -661,8 +625,8 @@ class DirWalker(_PluginBase):
         """
         if self._enabled and self._cron:
             return [{
-                "id": "DirMonitor",
-                "name": "目录监控全量同步服务",
+                "id": "DirWalker",
+                "name": "目录全量同步服务",
                 "trigger": CronTrigger.from_crontab(self._cron),
                 "func": self.sync_all,
                 "kwargs": {}
@@ -1013,5 +977,4 @@ class DirWalker(_PluginBase):
             if path.is_file() \
                     and re.match(pattern, path.name, re.IGNORECASE) \
                     and path.stat().st_size >= min_filesize * 1024 * 1024:
-                logger.debug(f"Yielding file: {path}")
                 yield path
