@@ -32,26 +32,6 @@ from app.utils.system import SystemUtils
 
 lock = threading.Lock()
 
-
-class FileMonitorHandler(FileSystemEventHandler):
-    """
-    目录监控响应类
-    """
-
-    def __init__(self, monpath: str, sync: Any, **kwargs):
-        super(FileMonitorHandler, self).__init__(**kwargs)
-        self._watch_path = monpath
-        self.sync = sync
-
-    def on_created(self, event):
-        self.sync.event_handler(event=event, text="创建",
-                                mon_path=self._watch_path, event_path=event.src_path)
-
-    def on_moved(self, event):
-        self.sync.event_handler(event=event, text="移动",
-                                mon_path=self._watch_path, event_path=event.dest_path)
-
-
 class DirWalker(_PluginBase):
     # 插件名称
     plugin_name = "定时目录同步"
@@ -60,7 +40,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "dir_walker.png"
     # 插件版本
-    plugin_version = "0.1"
+    plugin_version = "0.2"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页

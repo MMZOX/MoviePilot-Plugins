@@ -3,11 +3,12 @@
         "name": "定时目录同步",
         "description": "定时整理目录文件到媒体库。",
         "labels": "文件整理",
-        "version": "0.1",
+        "version": "0.2",
         "icon": "dir_walker.png",
         "author": "MMZOX",
         "level": 1,
         "history": {
+            "v0.2": "修复404",
             "v0.1": "初始版本"
         }
     }
