@@ -54,19 +54,19 @@ class FileMonitorHandler(FileSystemEventHandler):
 
 class DirMonitor(_PluginBase):
     # 插件名称
-    plugin_name = "目录监控"
+    plugin_name = "定时目录同步"
     # 插件描述
-    plugin_desc = "监控目录文件发生变化时实时整理到媒体库。"
+    plugin_desc = "定时整理目录文件到媒体库。"
     # 插件图标
     plugin_icon = "directory.png"
     # 插件版本
     plugin_version = "2.4"
     # 插件作者
-    plugin_author = "jxxghp"
+    plugin_author = "MMZOX"
     # 作者主页
-    author_url = "https://github.com/jxxghp"
+    author_url = "https://github.com/MMZOX"
     # 插件配置项ID前缀
-    plugin_config_prefix = "dirmonitor_"
+    plugin_config_prefix = "dirwalker_"
     # 加载顺序
     plugin_order = 4
     # 可使用的用户级别
@@ -86,8 +86,6 @@ class DirMonitor(_PluginBase):
     _cron = None
     _size = 0
     _scrape = True
-    # 模式 compatibility/fast
-    _mode = "fast"
     # 转移方式
     _transfer_type = "link"
     _monitor_dirs = ""
@@ -116,7 +114,6 @@ class DirMonitor(_PluginBase):
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
-            self._mode = config.get("mode")
             self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
@@ -184,32 +181,6 @@ class DirMonitor(_PluginBase):
                         logger.debug(str(e))
                         pass
 
-                    try:
-                        if self._mode == "compatibility":
-                            # 兼容模式，目录同步性能降低且NAS不能休眠，但可以兼容挂载的远程共享目录如SMB
-                            observer = PollingObserver(timeout=10)
-                        else:
-                            # 内部处理系统操作类型选择最优解
-                            observer = Observer(timeout=10)
-                        self._observer.append(observer)
-                        observer.schedule(FileMonitorHandler(mon_path, self), path=mon_path, recursive=True)
-                        observer.daemon = True
-                        observer.start()
-                        logger.info(f"{mon_path} 的目录监控服务启动")
-                    except Exception as e:
-                        err_msg = str(e)
-                        if "inotify" in err_msg and "reached" in err_msg:
-                            logger.warn(
-                                f"目录监控服务启动出现异常：{err_msg}，请在宿主机上（不是docker容器内）执行以下命令并重启："
-                                + """
-                                     echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
-                                     echo fs.inotify.max_user_instances=524288 | sudo tee -a /etc/sysctl.conf
-                                     sudo sysctl -p
-                                     """)
-                        else:
-                            logger.error(f"{mon_path} 启动目录监控失败：{err_msg}")
-                        self.systemmessage.put(f"{mon_path} 启动目录监控失败：{err_msg}", title="目录监控")
-
             # 运行一次定时服务
             if self._onlyonce:
                 logger.info("目录监控服务启动，立即运行一次")
@@ -235,7 +206,6 @@ class DirMonitor(_PluginBase):
             "enabled": self._enabled,
             "notify": self._notify,
             "onlyonce": self._onlyonce,
-            "mode": self._mode,
             "transfer_type": self._transfer_type,
             "monitor_dirs": self._monitor_dirs,
             "exclude_keywords": self._exclude_keywords,
