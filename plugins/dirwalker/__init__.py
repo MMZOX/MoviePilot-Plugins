@@ -220,7 +220,8 @@ class DirWalker(_PluginBase):
         # 遍历所有监控目录
         for mon_path in self._dirconf.keys():
             # 遍历目录下所有文件
-            for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
+            for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
+                logger.info(f"处理文件：{file_path}")
                 self.__handle_file(event_path=str(file_path), mon_path=mon_path)
         logger.info("全量同步监控目录完成！")
 
@@ -965,3 +966,31 @@ class DirWalker(_PluginBase):
                 self._scheduler.shutdown()
                 self._event.clear()
             self._scheduler = None
+
+
+    @staticmethod
+    def list_files(directory: Path, extensions: list, min_filesize: int = 0) -> List[Path]:
+        """
+        获取目录下所有指定扩展名的文件（包括子目录）
+        """
+
+        if not min_filesize:
+            min_filesize = 0
+
+        if not directory.exists():
+            return []
+
+        if directory.is_file():
+            return [directory]
+
+        if not min_filesize:
+            min_filesize = 0
+
+        pattern = r".*(" + "|".join(extensions) + ")$"
+
+        # 遍历目录及子目录
+        for path in directory.rglob('**/*'):
+            if path.is_file() \
+                    and re.match(pattern, path.name, re.IGNORECASE) \
+                    and path.stat().st_size >= min_filesize * 1024 * 1024:
+                yield path
