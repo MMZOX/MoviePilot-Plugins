@@ -40,7 +40,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "0.7"
+    plugin_version = "1.0"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -433,89 +433,79 @@ class DirWalker(_PluginBase):
                     transferinfo=transferinfo
                 )
 
-                # # 刮削单个文件
-                # if self._scrape:
-                #     self.chain.scrape_metadata(path=transferinfo.target_path,
-                #                                mediainfo=mediainfo,
-                #                                transfer_type=transfer_type)
+                # 刮削单个文件
+                if self._scrape:
+                    self.chain.scrape_metadata(path=transferinfo.target_path,
+                                               mediainfo=mediainfo,
+                                               transfer_type=transfer_type)
 
-                # """
-                # {
-                #     "title_year season": {
-                #         "files": [
-                #             {
-                #                 "path":,
-                #                 "mediainfo":,
-                #                 "file_meta":,
-                #                 "transferinfo":
-                #             }
-                #         ],
-                #         "time": "2023-08-24 23:23:23.332"
-                #     }
-                # }
-                # """
+                """
+                {
+                    "title_year season": {
+                        "files": [
+                            {
+                                "path":,
+                                "mediainfo":,
+                                "file_meta":,
+                                "transferinfo":
+                            }
+                        ],
+                        "time": "2023-08-24 23:23:23.332"
+                    }
+                }
+                """
                 # 发送消息汇总
-                # media_list = self._medias.get(mediainfo.title_year + " " + file_meta.season) or {}
-                # if media_list:
-                #     media_files = media_list.get("files") or []
-                #     if media_files:
-                #         file_exists = False
-                #         for file in media_files:
-                #             if str(file_path) == file.get("path"):
-                #                 file_exists = True
-                #                 break
-                #         if not file_exists:
-                #             media_files.append({
-                #                 "path": str(file_path),
-                #                 "mediainfo": mediainfo,
-                #                 "file_meta": file_meta,
-                #                 "transferinfo": transferinfo
-                #             })
-                #     else:
-                #         media_files = [
-                #             {
-                #                 "path": str(file_path),
-                #                 "mediainfo": mediainfo,
-                #                 "file_meta": file_meta,
-                #                 "transferinfo": transferinfo
-                #             }
-                #         ]
-                #     media_list = {
-                #         "files": media_files,
-                #         "time": datetime.datetime.now()
-                #     }
-                # else:
-                #     media_list = {
-                #         "files": [
-                #             {
-                #                 "path": str(file_path),
-                #                 "mediainfo": mediainfo,
-                #                 "file_meta": file_meta,
-                #                 "transferinfo": transferinfo
-                #             }
-                #         ],
-                #         "time": datetime.datetime.now()
-                #     }
-                # self._medias[mediainfo.title_year + " " + file_meta.season] = media_list
+                media_list = self._medias.get(mediainfo.title_year + " " + file_meta.season) or {}
+                if media_list:
+                    media_files = media_list.get("files") or []
+                    if media_files:
+                        file_exists = False
+                        for file in media_files:
+                            if str(file_path) == file.get("path"):
+                                file_exists = True
+                                break
+                        if not file_exists:
+                            media_files.append({
+                                "path": str(file_path),
+                                "mediainfo": mediainfo,
+                                "file_meta": file_meta,
+                                "transferinfo": transferinfo
+                            })
+                    else:
+                        media_files = [
+                            {
+                                "path": str(file_path),
+                                "mediainfo": mediainfo,
+                                "file_meta": file_meta,
+                                "transferinfo": transferinfo
+                            }
+                        ]
+                    media_list = {
+                        "files": media_files,
+                        "time": datetime.datetime.now()
+                    }
+                else:
+                    media_list = {
+                        "files": [
+                            {
+                                "path": str(file_path),
+                                "mediainfo": mediainfo,
+                                "file_meta": file_meta,
+                                "transferinfo": transferinfo
+                            }
+                        ],
+                        "time": datetime.datetime.now()
+                    }
+                self._medias[mediainfo.title_year + " " + file_meta.season] = media_list
 
-                # # 广播事件
-                # self.eventmanager.send_event(EventType.TransferComplete, {
-                #     'meta': file_meta,
-                #     'mediainfo': mediainfo,
-                #     'transferinfo': transferinfo
-                # })
+                # 广播事件
+                self.eventmanager.send_event(EventType.TransferComplete, {
+                    'meta': file_meta,
+                    'mediainfo': mediainfo,
+                    'transferinfo': transferinfo
+                })
 
                 # 移动模式删除空目录
-                # if transfer_type == "move":
-                #     logger.info(f"移动模式, decide空目录：{file_path}")
-                #     for file_dir in file_path.parents:
-                #         if len(str(file_dir)) <= len(str(Path(mon_path))):
-                #             # 重要，删除到监控目录为止
-                #             break
-                #         files = SystemUtils.list_files(file_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT)
-                #         if not files:
-                #             logger.warn(f"移动模式，删除空目录：{file_dir}")
-                #             shutil.rmtree(file_dir, ignore_errors=True)
                 if transfer_type == "move":
                     logger.info(f"移动模式, decide空目录：{file_path}")
                     parent_dir = file_path.parent
@@ -529,7 +519,6 @@ class DirWalker(_PluginBase):
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
 
     def send_msg(self):
-        return
         """
         定时检查是否有媒体处理完，发送统一消息
         """
