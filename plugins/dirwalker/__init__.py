@@ -1,3 +1,4 @@
+import os
 import datetime
 import re
 import shutil
@@ -986,11 +987,11 @@ class DirWalker(_PluginBase):
         if not min_filesize:
             min_filesize = 0
 
-        pattern = r".*(" + "|".join(extensions) + ")$"
+        pattern = re.compile(r".*(" + "|".join(extensions) + r")$", re.IGNORECASE)
+        min_filesize_bytes = min_filesize * 1024 * 1024
 
-        # 遍历目录及子目录
-        for path in directory.rglob('**/*'):
-            if path.is_file() \
-                    and re.match(pattern, path.name, re.IGNORECASE) \
-                    and path.stat().st_size >= min_filesize * 1024 * 1024:
-                yield path
+        for root, _, files in os.walk(directory):
+            for file_name in files:
+                file_path = Path(root) / file_name
+                if pattern.match(file_name) and file_path.stat().st_size >= min_filesize_bytes:
+                    yield file_path
