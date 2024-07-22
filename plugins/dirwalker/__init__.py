@@ -43,7 +43,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "1.8"
+    plugin_version = "1.9"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -78,6 +78,7 @@ class DirWalker(_PluginBase):
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
     _transferconf: Dict[str, Optional[str]] = {}
+    _dir_to_del: List[str] = []
     _medias = {}
     # 退出事件
     _event = threading.Event()
@@ -91,6 +92,7 @@ class DirWalker(_PluginBase):
         # 清空配置
         self._dirconf = {}
         self._transferconf = {}
+        self._dir_to_del = []
 
         # 读取配置
         if config:
@@ -235,6 +237,11 @@ class DirWalker(_PluginBase):
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)
             except Exception as e:
                 logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
+        else:
+            if self._tranverse_mode == "部分":
+                logger.info("开始删除空目录 ...")
+                self.delete_empty_dir()
+                logger.info("删除空目录完成！")
         logger.info("全量同步监控目录完成！")
 
     def event_handler(self, event, mon_path: str, text: str, event_path: str):
@@ -515,7 +522,9 @@ class DirWalker(_PluginBase):
                 })
 
                 # 移动模式删除空目录
-                if transfer_type == "move":
+                if transfer_type == "部分":
+                    self._dir_to_del.append(file_path.parent)
+                elif self._tranverse_mode == "全量":
                     parent_dir = file_path.parent
                     for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
                         break
@@ -1000,3 +1009,18 @@ class DirWalker(_PluginBase):
                     and re.match(pattern, path.name, re.IGNORECASE) \
                     and path.stat().st_size >= min_filesize * 1024 * 1024:
                 yield path
+
+    
+    def delete_empty_dir(self):
+        """
+        删除空目录
+        """
+        for dir_path in self._dir_to_del:
+            directory = Path(dir_path)
+            pattern = r".*(" + "|".join(settings.RMT_MEDIAEXT) + ")$"
+            for path in directory.rglob('**/*'):
+                if path.is_file() and re.match(pattern, path.name, re.IGNORECASE):
+                    break
+            else:
+                logger.info(f"删除空目录：{dir_path}")
+                shutil.rmtree(dir_path, ignore_errors=True)
