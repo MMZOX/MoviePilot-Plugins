@@ -227,18 +227,18 @@ class DirWalker(_PluginBase):
         for mon_path in self._dirconf.keys():
             # 遍历目录下所有文件
             try: 
-                if self._tranverse_mode == "全量":
+                if self._tranverse_mode == "full":
                     for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
                         logger.info(f"处理文件：{file_path}")
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)                   
-                elif self._tranverse_mode == "部分":
+                elif self._tranverse_mode == "partial":
                     for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
                         logger.info(f"处理文件：{file_path}")
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)
             except Exception as e:
                 logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
         else:
-            if self._tranverse_mode == "部分":
+            if self._tranverse_mode == "partial":
                 logger.info("开始删除空目录 ...")
                 self.delete_empty_dir()
                 logger.info("删除空目录完成！")
@@ -522,9 +522,9 @@ class DirWalker(_PluginBase):
                 })
 
                 # 移动模式删除空目录
-                if transfer_type == "部分":
+                if transfer_type == "full":
                     self._dir_to_del.append(file_path.parent)
-                elif self._tranverse_mode == "全量":
+                elif self._tranverse_mode == "partial":
                     parent_dir = file_path.parent
                     for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
                         break
@@ -725,6 +725,10 @@ class DirWalker(_PluginBase):
                                         'props': {
                                             'model': 'tranverse_mode',
                                             'label': '遍历模式',
+                                            'items': [
+                                                {'title': '全量', 'value': 'full'},
+                                                {'title': '部分', 'value': 'partial'},
+                                            ]
                                         }
                                     }
                                 ]
