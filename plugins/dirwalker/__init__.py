@@ -43,7 +43,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "1.6"
+    plugin_version = "1.7"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -509,13 +509,13 @@ class DirWalker(_PluginBase):
                 })
 
                 # 移动模式删除空目录
-                if transfer_type == "move":
-                    parent_dir = file_path.parent
-                    for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
-                        break
-                    else:
-                        logger.info(f"移动模式，删除空目录：{parent_dir}")
-                        shutil.rmtree(parent_dir, ignore_errors=True)
+                # if transfer_type == "move":
+                #     parent_dir = file_path.parent
+                #     for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
+                #         break
+                #     else:
+                #         logger.info(f"移动模式，删除空目录：{parent_dir}")
+                #         shutil.rmtree(parent_dir, ignore_errors=True)
 
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
