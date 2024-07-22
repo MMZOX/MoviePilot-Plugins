@@ -230,11 +230,11 @@ class DirWalker(_PluginBase):
                 if self._fullsync:
                     for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
                         logger.info(f"处理文件：{file_path}")
-                    self.__handle_file(event_path=str(file_path), mon_path=mon_path)                   
+                        self.__handle_file(event_path=str(file_path), mon_path=mon_path)                   
                 else:
                     for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
                         logger.info(f"处理文件：{file_path}")
-                    self.__handle_file(event_path=str(file_path), mon_path=mon_path)
+                        self.__handle_file(event_path=str(file_path), mon_path=mon_path)
             except Exception as e:
                 logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
         else:
