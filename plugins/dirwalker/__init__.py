@@ -43,7 +43,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "1.7"
+    plugin_version = "1.8"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -97,6 +97,7 @@ class DirWalker(_PluginBase):
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
+            self._tranverse_mode = config.get("tranverse_mode")
             self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
@@ -224,8 +225,13 @@ class DirWalker(_PluginBase):
         for mon_path in self._dirconf.keys():
             # 遍历目录下所有文件
             try: 
-                for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
-                    logger.info(f"处理文件：{file_path}")
+                if self._tranverse_mode == "全量":
+                    for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
+                        logger.info(f"处理文件：{file_path}")
+                    self.__handle_file(event_path=str(file_path), mon_path=mon_path)                   
+                elif self._tranverse_mode == "部分":
+                    for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
+                        logger.info(f"处理文件：{file_path}")
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)
             except Exception as e:
                 logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
@@ -509,13 +515,13 @@ class DirWalker(_PluginBase):
                 })
 
                 # 移动模式删除空目录
-                # if transfer_type == "move":
-                #     parent_dir = file_path.parent
-                #     for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
-                #         break
-                #     else:
-                #         logger.info(f"移动模式，删除空目录：{parent_dir}")
-                #         shutil.rmtree(parent_dir, ignore_errors=True)
+                if transfer_type == "move":
+                    parent_dir = file_path.parent
+                    for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
+                        break
+                    else:
+                        logger.info(f"移动模式，删除空目录：{parent_dir}")
+                        shutil.rmtree(parent_dir, ignore_errors=True)
 
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
@@ -694,6 +700,22 @@ class DirWalker(_PluginBase):
                                         'props': {
                                             'model': 'onlyonce',
                                             'label': '立即运行一次',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'tranverse_mode',
+                                            'label': '遍历模式',
                                         }
                                     }
                                 ]
