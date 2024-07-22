@@ -43,7 +43,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://files.closeai.biz/file-z5dmIeKEMJz5PIoMYGOPeMFS?se=2024-07-19T17%3A38%3A14Z&sp=r&sv=2023-11-03&sr=b&rscc=max-age%3D604800%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Da702ca25-649f-4a65-ba6d-d00e3db114a7.webp&sig=xet3lg0SbCQ6yj7SJa9H6RjQ3cqKvrkcqCg7FGZnFCI%3D"
     # 插件版本
-    plugin_version = "1.9"
+    plugin_version = "2.0"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -99,7 +99,7 @@ class DirWalker(_PluginBase):
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
-            self._tranverse_mode = config.get("tranverse_mode")
+            self._fullsync = config.get("fullsync")
             self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
@@ -227,18 +227,18 @@ class DirWalker(_PluginBase):
         for mon_path in self._dirconf.keys():
             # 遍历目录下所有文件
             try: 
-                if self._tranverse_mode == "full":
+                if self._fullsync:
                     for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
                         logger.info(f"处理文件：{file_path}")
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)                   
-                elif self._tranverse_mode == "partial":
+                else:
                     for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
                         logger.info(f"处理文件：{file_path}")
                     self.__handle_file(event_path=str(file_path), mon_path=mon_path)
             except Exception as e:
                 logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
         else:
-            if self._tranverse_mode == "partial":
+            if not self._fullsync:
                 logger.info("开始删除空目录 ...")
                 self.delete_empty_dir()
                 logger.info("删除空目录完成！")
@@ -522,9 +522,9 @@ class DirWalker(_PluginBase):
                 })
 
                 # 移动模式删除空目录
-                if transfer_type == "full":
+                if not self._fullsync:
                     self._dir_to_del.append(file_path.parent)
-                elif self._tranverse_mode == "partial":
+                else:
                     parent_dir = file_path.parent
                     for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
                         break
@@ -721,14 +721,10 @@ class DirWalker(_PluginBase):
                                 },
                                 'content': [
                                     {
-                                        'component': 'VSwitch',
+                                        'component': 'VSelect',
                                         'props': {
-                                            'model': 'tranverse_mode',
-                                            'label': '遍历模式',
-                                            'items': [
-                                                {'title': '全量', 'value': 'full'},
-                                                {'title': '部分', 'value': 'partial'},
-                                            ]
+                                            'model': 'fullsync',
+                                            'label': '全量同步',
                                         }
                                     }
                                 ]
