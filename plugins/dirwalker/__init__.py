@@ -721,7 +721,7 @@ class DirWalker(_PluginBase):
                                 },
                                 'content': [
                                     {
-                                        'component': 'VSelect',
+                                        'component': 'VSwitch',
                                         'props': {
                                             'model': 'fullsync',
                                             'label': '全量同步',
