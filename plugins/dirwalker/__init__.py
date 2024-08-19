@@ -43,7 +43,7 @@ class DirWalker(_PluginBase):
     # 插件图标
     plugin_icon = "https://image.yes.vg/i/2024/07/22/669debd153d58.png"
     # 插件版本
-    plugin_version = "2.2"
+    plugin_version = "2.3"
     # 插件作者
     plugin_author = "MMZOX"
     # 作者主页
@@ -270,10 +270,6 @@ class DirWalker(_PluginBase):
             # 全程加锁
             with lock:
                 transfer_history = self.transferhis.get_by_src(event_path)
-                # if transfer_history:
-                #     logger.debug("文件已处理过：%s" % event_path)
-                #     return
-
                 # 回收站及隐藏的文件不处理
                 if event_path.find('/@Recycle/') != -1 \
                         or event_path.find('/#recycle/') != -1 \
@@ -402,6 +398,9 @@ class DirWalker(_PluginBase):
                 if not transferinfo.success:
                     # 判断是否转移后文件已存在，补充转移成功历史记录
                     if transferinfo.target_path and transferinfo.target_path.exists():
+                        if transfer_history:
+                            logger.debug("文件已处理过：%s" % event_path)
+                            return
                         logger.info(f"{file_path.name} 目标文件已存在，补充转移成功历史记录")
                         # 补充转移成功历史记录
                         self.transferhis.add_success(
