@@ -1,14 +1,11 @@
-import os
 import datetime
 import re
 import shutil
 import threading
 import traceback
-import contextlib
-import pathlib
-
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
+
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -35,21 +32,41 @@ from app.utils.system import SystemUtils
 
 lock = threading.Lock()
 
-class DirWalker(_PluginBase):
+
+class FileMonitorHandler(FileSystemEventHandler):
+    """
+    目录监控响应类
+    """
+
+    def __init__(self, monpath: str, sync: Any, **kwargs):
+        super(FileMonitorHandler, self).__init__(**kwargs)
+        self._watch_path = monpath
+        self.sync = sync
+
+    def on_created(self, event):
+        self.sync.event_handler(event=event, text="创建",
+                                mon_path=self._watch_path, event_path=event.src_path)
+
+    def on_moved(self, event):
+        self.sync.event_handler(event=event, text="移动",
+                                mon_path=self._watch_path, event_path=event.dest_path)
+
+
+class DirMonitor2(_PluginBase):
     # 插件名称
-    plugin_name = "定时目录同步"
+    plugin_name = "目录监控2"
     # 插件描述
-    plugin_desc = "定时整理目录文件到媒体库。"
+    plugin_desc = "监控目录文件发生变化时实时整理到媒体库。"
     # 插件图标
-    plugin_icon = "https://image.yes.vg/i/2024/07/22/669debd153d58.png"
+    plugin_icon = "directory.png"
     # 插件版本
-    plugin_version = "2.3"
+    plugin_version = "1.0"
     # 插件作者
-    plugin_author = "MMZOX"
+    plugin_author = "mmzox"
     # 作者主页
     author_url = "https://github.com/MMZOX"
     # 插件配置项ID前缀
-    plugin_config_prefix = "dirwalker_"
+    plugin_config_prefix = "dirmonitor2_"
     # 加载顺序
     plugin_order = 4
     # 可使用的用户级别
@@ -69,6 +86,8 @@ class DirWalker(_PluginBase):
     _cron = None
     _size = 0
     _scrape = True
+    # 模式 compatibility/fast
+    _mode = "fast"
     # 转移方式
     _transfer_type = "link"
     _monitor_dirs = ""
@@ -78,7 +97,6 @@ class DirWalker(_PluginBase):
     _dirconf: Dict[str, Optional[Path]] = {}
     # 存储源目录转移方式
     _transferconf: Dict[str, Optional[str]] = {}
-    _dir_to_del: List[str] = []
     _medias = {}
     # 退出事件
     _event = threading.Event()
@@ -92,14 +110,13 @@ class DirWalker(_PluginBase):
         # 清空配置
         self._dirconf = {}
         self._transferconf = {}
-        self._dir_to_del = []
 
         # 读取配置
         if config:
             self._enabled = config.get("enabled")
             self._notify = config.get("notify")
             self._onlyonce = config.get("onlyonce")
-            self._fullsync = config.get("fullsync")
+            self._mode = config.get("mode")
             self._transfer_type = config.get("transfer_type")
             self._monitor_dirs = config.get("monitor_dirs") or ""
             self._exclude_keywords = config.get("exclude_keywords") or ""
@@ -167,6 +184,32 @@ class DirWalker(_PluginBase):
                         logger.debug(str(e))
                         pass
 
+                    try:
+                        if self._mode == "compatibility":
+                            # 兼容模式，目录同步性能降低且NAS不能休眠，但可以兼容挂载的远程共享目录如SMB
+                            observer = PollingObserver(timeout=10)
+                        else:
+                            # 内部处理系统操作类型选择最优解
+                            observer = Observer(timeout=10)
+                        self._observer.append(observer)
+                        observer.schedule(FileMonitorHandler(mon_path, self), path=mon_path, recursive=True)
+                        observer.daemon = True
+                        observer.start()
+                        logger.info(f"{mon_path} 的目录监控服务启动")
+                    except Exception as e:
+                        err_msg = str(e)
+                        if "inotify" in err_msg and "reached" in err_msg:
+                            logger.warn(
+                                f"目录监控服务启动出现异常：{err_msg}，请在宿主机上（不是docker容器内）执行以下命令并重启："
+                                + """
+                                     echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+                                     echo fs.inotify.max_user_instances=524288 | sudo tee -a /etc/sysctl.conf
+                                     sudo sysctl -p
+                                     """)
+                        else:
+                            logger.error(f"{mon_path} 启动目录监控失败：{err_msg}")
+                        self.systemmessage.put(f"{mon_path} 启动目录监控失败：{err_msg}", title="目录监控")
+
             # 运行一次定时服务
             if self._onlyonce:
                 logger.info("目录监控服务启动，立即运行一次")
@@ -192,6 +235,7 @@ class DirWalker(_PluginBase):
             "enabled": self._enabled,
             "notify": self._notify,
             "onlyonce": self._onlyonce,
+            "mode": self._mode,
             "transfer_type": self._transfer_type,
             "monitor_dirs": self._monitor_dirs,
             "exclude_keywords": self._exclude_keywords,
@@ -226,22 +270,8 @@ class DirWalker(_PluginBase):
         # 遍历所有监控目录
         for mon_path in self._dirconf.keys():
             # 遍历目录下所有文件
-            try: 
-                if self._fullsync:
-                    for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
-                        logger.info(f"处理文件：{file_path}")
-                        self.__handle_file(event_path=str(file_path), mon_path=mon_path)                   
-                else:
-                    for file_path in self.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
-                        logger.info(f"处理文件：{file_path}")
-                        self.__handle_file(event_path=str(file_path), mon_path=mon_path)
-            except Exception as e:
-                logger.error(f"处理文件 {mon_path} 时发生错误：{e}")
-        else:
-            if not self._fullsync:
-                logger.info("开始删除空目录 ...")
-                self.delete_empty_dir()
-                logger.info("删除空目录完成！")
+            for file_path in SystemUtils.list_files(Path(mon_path), settings.RMT_MEDIAEXT):
+                self.__handle_file(event_path=str(file_path), mon_path=mon_path)
         logger.info("全量同步监控目录完成！")
 
     def event_handler(self, event, mon_path: str, text: str, event_path: str):
@@ -270,9 +300,6 @@ class DirWalker(_PluginBase):
             # 全程加锁
             with lock:
                 transfer_history = self.transferhis.get_by_src(event_path)
-                if transfer_history:
-                    logger.debug("文件已处理过：%s" % event_path)
-                    return
                 # 回收站及隐藏的文件不处理
                 if event_path.find('/@Recycle/') != -1 \
                         or event_path.find('/#recycle/') != -1 \
@@ -311,6 +338,11 @@ class DirWalker(_PluginBase):
                     blurray_dir = event_path[:event_path.find("BDMV")]
                     file_path = Path(blurray_dir)
                     logger.info(f"{event_path} 是蓝光目录，更正文件路径为：{str(file_path)}")
+
+                # 查询历史记录，已转移的不处理
+                if self.transferhis.get_by_src(str(file_path)):
+                    logger.info(f"{file_path} 已整理过")
+                    return
 
                 # 元数据
                 file_meta = MetaInfoPath(file_path)
@@ -401,7 +433,9 @@ class DirWalker(_PluginBase):
                 if not transferinfo.success:
                     # 判断是否转移后文件已存在，补充转移成功历史记录
                     if transferinfo.target_path and transferinfo.target_path.exists():
-
+                        if transfer_history:
+                            logger.debug("文件已处理过：%s" % event_path)
+                            return
                         logger.info(f"{file_path.name} 目标文件已存在，补充转移成功历史记录")
                         # 补充转移成功历史记录
                         self.transferhis.add_success(
@@ -517,15 +551,15 @@ class DirWalker(_PluginBase):
                 })
 
                 # 移动模式删除空目录
-                if not self._fullsync:
-                    self._dir_to_del.append(file_path.parent)
-                else:
-                    parent_dir = file_path.parent
-                    for _ in self.list_files(parent_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT):
-                        break
-                    else:
-                        logger.info(f"移动模式，删除空目录：{parent_dir}")
-                        shutil.rmtree(parent_dir, ignore_errors=True)
+                if transfer_type == "move":
+                    for file_dir in file_path.parents:
+                        if len(str(file_dir)) <= len(str(Path(mon_path))):
+                            # 重要，删除到监控目录为止
+                            break
+                        files = SystemUtils.list_files(file_dir, settings.RMT_MEDIAEXT + settings.DOWNLOAD_TMPEXT)
+                        if not files:
+                            logger.warn(f"移动模式，删除空目录：{file_dir}")
+                            shutil.rmtree(file_dir, ignore_errors=True)
 
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
@@ -635,8 +669,8 @@ class DirWalker(_PluginBase):
         """
         if self._enabled and self._cron:
             return [{
-                "id": "DirWalker",
-                "name": "目录全量同步服务",
+                "id": "DirMonitor2",
+                "name": "目录监控全量同步服务",
                 "trigger": CronTrigger.from_crontab(self._cron),
                 "func": self.sync_all,
                 "kwargs": {}
@@ -707,7 +741,12 @@ class DirWalker(_PluginBase):
                                         }
                                     }
                                 ]
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
                             {
                                 'component': 'VCol',
                                 'props': {
@@ -716,19 +755,18 @@ class DirWalker(_PluginBase):
                                 },
                                 'content': [
                                     {
-                                        'component': 'VSwitch',
+                                        'component': 'VSelect',
                                         'props': {
-                                            'model': 'fullsync',
-                                            'label': '全量同步',
+                                            'model': 'mode',
+                                            'label': '监控模式',
+                                            'items': [
+                                                {'title': '兼容模式', 'value': 'compatibility'},
+                                                {'title': '性能模式', 'value': 'fast'}
+                                            ]
                                         }
                                     }
                                 ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
+                            },
                             {
                                 'component': 'VCol',
                                 'props': {
@@ -976,46 +1014,3 @@ class DirWalker(_PluginBase):
                 self._scheduler.shutdown()
                 self._event.clear()
             self._scheduler = None
-
-
-    @staticmethod
-    def list_files(directory: Path, extensions: list, min_filesize: int = 0) -> List[Path]:
-        """
-        获取目录下所有指定扩展名的文件（包括子目录）
-        """
-
-        if not min_filesize:
-            min_filesize = 0
-
-        if not directory.exists():
-            return []
-
-        if directory.is_file():
-            return [directory]
-
-        if not min_filesize:
-            min_filesize = 0
-
-        pattern = r".*(" + "|".join(extensions) + ")$"
-
-        # 遍历目录及子目录
-        for path in directory.rglob('**/*'):
-            if path.is_file() \
-                    and re.match(pattern, path.name, re.IGNORECASE) \
-                    and path.stat().st_size >= min_filesize * 1024 * 1024:
-                yield path
-
-    
-    def delete_empty_dir(self):
-        """
-        删除空目录
-        """
-        for dir_path in self._dir_to_del:
-            directory = Path(dir_path)
-            pattern = r".*(" + "|".join(settings.RMT_MEDIAEXT) + ")$"
-            for path in directory.rglob('**/*'):
-                if path.is_file() and re.match(pattern, path.name, re.IGNORECASE):
-                    break
-            else:
-                logger.info(f"删除空目录：{dir_path}")
-                shutil.rmtree(dir_path, ignore_errors=True)

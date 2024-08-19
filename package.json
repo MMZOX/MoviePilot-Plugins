@@ -22,5 +22,17 @@
             "v1.1": "remove unused options",
             "v1.0": "first working version"
         }
+    },
+    "DirMonitor2": {
+        "name": "目录同步2",
+        "description": "定时整理目录文件到媒体库。",
+        "labels": "文件整理",
+        "version": "1.0",
+        "icon": "https://image.yes.vg/i/2024/07/22/669debd153d58.png",
+        "author": "MMZOX",
+        "level": 1,
+        "history": {
+            "v1.0": "first working version"
+        }
     }
 }
