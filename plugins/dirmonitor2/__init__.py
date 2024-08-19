@@ -60,7 +60,7 @@ class DirMonitor2(_PluginBase):
     # 插件图标
     plugin_icon = "directory.png"
     # 插件版本
-    plugin_version = "1.0"
+    plugin_version = "1.1"
     # 插件作者
     plugin_author = "mmzox"
     # 作者主页
@@ -339,11 +339,6 @@ class DirMonitor2(_PluginBase):
                     file_path = Path(blurray_dir)
                     logger.info(f"{event_path} 是蓝光目录，更正文件路径为：{str(file_path)}")
 
-                # 查询历史记录，已转移的不处理
-                if self.transferhis.get_by_src(str(file_path)):
-                    logger.info(f"{file_path} 已整理过")
-                    return
-
                 # 元数据
                 file_meta = MetaInfoPath(file_path)
                 if not file_meta.name:
@@ -434,7 +429,7 @@ class DirMonitor2(_PluginBase):
                     # 判断是否转移后文件已存在，补充转移成功历史记录
                     if transferinfo.target_path and transferinfo.target_path.exists():
                         if transfer_history:
-                            logger.debug("文件已处理过：%s" % event_path)
+                            logger.info("文件已处理过且目标文件未变更：%s" % event_path)
                             return
                         logger.info(f"{file_path.name} 目标文件已存在，补充转移成功历史记录")
                         # 补充转移成功历史记录
