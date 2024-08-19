@@ -270,9 +270,9 @@ class DirWalker(_PluginBase):
             # 全程加锁
             with lock:
                 transfer_history = self.transferhis.get_by_src(event_path)
-                if transfer_history:
-                    logger.debug("文件已处理过：%s" % event_path)
-                    return
+                # if transfer_history:
+                #     logger.debug("文件已处理过：%s" % event_path)
+                #     return
 
                 # 回收站及隐藏的文件不处理
                 if event_path.find('/@Recycle/') != -1 \
@@ -312,11 +312,6 @@ class DirWalker(_PluginBase):
                     blurray_dir = event_path[:event_path.find("BDMV")]
                     file_path = Path(blurray_dir)
                     logger.info(f"{event_path} 是蓝光目录，更正文件路径为：{str(file_path)}")
-
-                # 查询历史记录，已转移的不处理
-                if self.transferhis.get_by_src(str(file_path)):
-                    logger.info(f"{file_path} 已整理过")
-                    return
 
                 # 元数据
                 file_meta = MetaInfoPath(file_path)
