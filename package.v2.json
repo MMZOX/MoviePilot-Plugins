@@ -208,7 +208,7 @@
         "name": "实时STRM生成",
         "description": "监控入库事件，实时生成STRM文件。",
         "labels": "媒体库",
-        "version": "0.22",
+        "version": "0.23",
         "icon": "https://s1.locimg.com/2024/11/07/06b2b87af76d0.png",
         "author": "MMZOX",
         "level": 1

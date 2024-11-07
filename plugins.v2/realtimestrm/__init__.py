@@ -7,14 +7,14 @@ from app.core.event import eventmanager
 from app.schemas.types import EventType
 from app.log import logger
 from app.plugins import _PluginBase
-from app.filemanager.storages import FileManagerModule
+from app.modules.filemanager import FileManagerModule
 
 class RealTimeStrm(_PluginBase):
     # Plugin metadata
     plugin_name = "实时STRM生成"
     plugin_desc = "监控入库事件，实时生成STRM文件。"
     plugin_icon = "https://s1.locimg.com/2024/11/07/06b2b87af76d0.png"
-    plugin_version = "0.22"
+    plugin_version = "0.23"
     plugin_author = "MMZOX"
     plugin_config_prefix = "realtimestrm_"
     plugin_order = 22
