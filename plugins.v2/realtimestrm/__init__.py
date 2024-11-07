@@ -1,37 +1,66 @@
 import os
 from pathlib import Path
 from typing import Any, List, Dict, Tuple
+from datetime import datetime
 
-from app.core.event import eventmanager, Event
+from app.core.event import eventmanager
 from app.schemas.types import EventType
 from app.log import logger
 from app.plugins import _PluginBase
-from app.core.config import settings
+from app.filemanager.storages import FileManagerModule
 
 class RealTimeStrm(_PluginBase):
     # Plugin metadata
     plugin_name = "实时STRM生成"
     plugin_desc = "监控入库事件，实时生成STRM文件。"
     plugin_icon = "https://s1.locimg.com/2024/11/07/06b2b87af76d0.png"
-    plugin_version = "0.1"
+    plugin_version = "0.22"
     plugin_author = "MMZOX"
     plugin_config_prefix = "realtimestrm_"
-    plugin_order = 21
+    plugin_order = 22
     auth_level = 1
 
-    # Private variables
+    # Private attributes
     _enabled = False
     _dest_dir = None
-
+    _replace_prefix = None
+    _target_prefix = None
+    _cloud_type = None
+    _cloud_client = None
+    _download_extra = False
+    _filemanager = None
+    _history = []
+    
     def init_plugin(self, config: dict = None):
         if config:
             self._enabled = config.get("enabled")
             self._dest_dir = config.get("dest_dir")
+            self._replace_prefix = config.get("replace_prefix")
+            self._target_prefix = config.get("target_prefix")
+            self._cloud_type = config.get("cloud_type")
+            self._download_extra = config.get("download_extra")
+            
+        # Initialize FileManager module
+        self._filemanager = FileManagerModule()
+        self._filemanager.init_module()
+        
+        # Load history
+        self._history = self.get_data('history') or []
 
     def get_state(self) -> bool:
         return self._enabled
 
+    @staticmethod
+    def get_command() -> List[Dict[str, Any]]:
+        pass
+
+    def get_api(self) -> List[Dict[str, Any]]:
+        pass
+
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
+        """
+        Get plugin form
+        """
         return [
             {
                 'component': 'VForm',
@@ -63,15 +92,19 @@ class RealTimeStrm(_PluginBase):
                             {
                                 'component': 'VCol',
                                 'props': {
-                                    'cols': 12
+                                    'cols': 12,
+                                    'md': 6
                                 },
                                 'content': [
                                     {
-                                        'component': 'VTextField',
+                                        'component': 'VSelect',
                                         'props': {
-                                            'model': 'dest_dir',
-                                            'label': 'STRM文件目录',
-                                            'placeholder': '/movies/strm'
+                                            'model': 'cloud_type',
+                                            'label': '云盘类型',
+                                            'items': [
+                                                {'title': '阿里云盘', 'value': 'aliyundrive'},
+                                                {'title': '115网盘', 'value': '115'}
+                                            ]
                                         }
                                     }
                                 ]
@@ -84,15 +117,57 @@ class RealTimeStrm(_PluginBase):
                             {
                                 'component': 'VCol',
                                 'props': {
-                                    'cols': 12,
+                                    'cols': 12
                                 },
                                 'content': [
                                     {
-                                        'component': 'VAlert',
+                                        'component': 'VTextField',
                                         'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': '插件会监控媒体入库事件，自动在指定目录下生成对应的STRM文件。'
+                                            'model': 'replace_prefix',
+                                            'label': '替换前缀',
+                                            'placeholder': '要替换的路径前缀，如 MediaV2'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
+                                            'model': 'target_prefix',
+                                            'label': '目标前缀',
+                                            'placeholder': '替换后的路径前缀，如 CloudASJ'
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'download_extra',
+                                            'label': '下载额外文件',
+                                            'hint': '下载字幕、图片等额外文件'
                                         }
                                     }
                                 ]
@@ -103,77 +178,114 @@ class RealTimeStrm(_PluginBase):
             }
         ], {
             "enabled": False,
-            "dest_dir": ""
+            "cloud_type": "aliyundrive",
+            "replace_prefix": "",
+            "target_prefix": "",
+            "download_extra": False
         }
 
-    @eventmanager.register(EventType.TransferComplete)
-    def transfer_completed(self, event: Event):
-        """
-        Handle transfer complete event
-        """
-        if not self._enabled:
-            return
-        
-        if not event.event_data:
-            return
-
-        # Get file info from event
-        transferinfo = event.event_data.get("transferinfo")
-        if not transferinfo:
-            return
-            
-        file_list = transferinfo.file_list_new
-        for file in file_list:
-            file_path = Path(file)
-            if not file_path.exists():
-                logger.warn(f"{file_path} 不存在")
-                continue
-            if file_path.suffix not in settings.RMT_MEDIAEXT:
-                logger.warn(f"{file_path} 不是支持的视频文件")
-                continue
-            self.__create_strm(file)
-
-    def __create_strm(self, source_file: str):
-        """
-        Create STRM file
-        """
+    def __create_strm(self, transfer_info):
+        """Create STRM file"""
         try:
-            # Get video name
-            video_name = Path(source_file).name
-            
-            # Create dest dir if not exists
-            if not Path(self._dest_dir).exists():
-                logger.info(f"创建STRM文件目录 {self._dest_dir}")
-                os.makedirs(self._dest_dir)
-
-            # Construct STRM file path
-            strm_path = os.path.join(self._dest_dir, f"{os.path.splitext(video_name)[0]}.strm")
-            
-            # Skip if STRM exists
-            if Path(strm_path).exists():
-                logger.info(f"STRM文件已存在 {strm_path}")
+            if not transfer_info.target_item:
                 return
+                
+            file_path = Path(transfer_info.target_item.path)
+            strm_path = Path(self._dest_dir) / file_path.relative_to(self._replace_prefix if self._replace_prefix else file_path.parts[0])
+            strm_path = strm_path.with_suffix('.strm')
+            
+            # Create parent directory
+            os.makedirs(strm_path.parent, exist_ok=True)
+            
+            # Generate STRM content
+            strm_content = transfer_info.target_item.path
+            if self._replace_prefix and strm_content.startswith(self._replace_prefix):
+                strm_content = strm_content[len(self._replace_prefix):].lstrip('/')
+                if self._target_prefix:
+                    strm_content = f"{self._target_prefix}/{strm_content}"
+            elif self._target_prefix:
+                strm_content = f"{self._target_prefix}/{strm_content}"
 
-            # Write STRM file with source path
-            with open(strm_path, 'w') as f:
-                f.write(source_file)
+            # Write STRM file
+            with open(strm_path, 'w', encoding='utf-8') as f:
+                f.write(strm_content)
 
             logger.info(f"创建STRM文件 {strm_path}")
+
+            # Handle extra files if enabled
+            if self._download_extra:
+                self.__handle_extra_files(transfer_info)
 
         except Exception as e:
             logger.error(f"创建STRM文件失败: {str(e)}")
 
-    def get_command(self) -> List[Dict[str, Any]]:
-        return []
+    def __handle_extra_files(self, transfer_info):
+        """Handle downloading extra files like subtitles and images"""
+        try:
+            if not transfer_info.target_diritem:
+                logger.debug("未获取到目标目录信息，跳过下载额外文件")
+                return
+                
+            logger.info(f"开始检索目录额外文件：{transfer_info.target_diritem.path}")
+            
+            # List all files in the directory
+            files = self._filemanager.list_files(transfer_info.target_diritem)
+            if not files:
+                logger.debug(f"目录 {transfer_info.target_diritem.path} 中没有找到文件")
+                return
+                
+            extra_count = 0
+            for file in files:
+                if file.extension.lower() in ['srt', 'ass', 'ssa', 'jpg', 'png']:
+                    dest_path = Path(self._dest_dir) / Path(file.path).relative_to(
+                        self._replace_prefix if self._replace_prefix else Path(file.path).parts[0]
+                    )
+                    
+                    if dest_path.exists():
+                        logger.debug(f"文件已存在，跳过：{dest_path}")
+                        continue
+                        
+                    logger.info(f"发现额外文件：{file.path}")
+                    os.makedirs(dest_path.parent, exist_ok=True)
+                    
+                    if self._filemanager.download_file(file, dest_path):
+                        extra_count += 1
+                        logger.info(f"下载额外文件成功：{dest_path}")
+                    else:
+                        logger.error(f"下载额外文件失败：{dest_path}")
 
-    def get_api(self) -> List[Dict[str, Any]]:
-        return []
+            if extra_count:
+                logger.info(f"共下载 {extra_count} 个额外文件")
+            else:
+                logger.debug("未找到需要下载的额外文件")
 
-    def get_service(self) -> List[Dict[str, Any]]:
-        return []
+        except Exception as e:
+            logger.error(f"处理额外文件失败: {str(e)}")
 
-    def get_page(self) -> List[dict]:
-        return []
-
-    def stop_service(self):
-        pass
+    @eventmanager.register(EventType.TransferComplete)
+    def handle_transfer_complete(self, event):
+        """Handle transfer complete event"""
+        try:
+            if not self._enabled:
+                return
+                
+            logger.info(f"收到入库事件，开始处理：{event}")
+            
+            transfer_info = event.get("transfer_info")
+            if not transfer_info:
+                logger.error("转移信息为空")
+                return
+                
+            if self._download_extra:
+                self.__handle_extra_files(transfer_info)
+                
+            # Save history like RssSubscribe
+            self._history.append({
+                "title": transfer_info.title,
+                "path": str(transfer_info.target_item.path) if transfer_info.target_item else "",
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+            self.save_data('history', self._history)
+                
+        except Exception as e:
+            logger.error(f"处理入库事件异常: {str(e)}")
