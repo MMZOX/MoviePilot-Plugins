@@ -14,7 +14,7 @@ class RealTimeStrm(_PluginBase):
     plugin_name = "实时STRM生成"
     plugin_desc = "监控入库事件，实时生成STRM文件。"
     plugin_icon = "https://s1.locimg.com/2024/11/07/06b2b87af76d0.png"
-    plugin_version = "0.24"
+    plugin_version = "0.25"
     plugin_author = "MMZOX"
     plugin_config_prefix = "realtimestrm_"
     plugin_order = 22
@@ -292,8 +292,10 @@ class RealTimeStrm(_PluginBase):
                 return
                 
             logger.info(f"收到入库事件，开始处理：{event}")
-            
-            transfer_info = event.get("transfer_info")
+            item = event.event_data 
+            if not item:
+                return
+            transfer_info = item.get("transferinfo")
             if not transfer_info:
                 logger.error("转移信息为空")
                 return
